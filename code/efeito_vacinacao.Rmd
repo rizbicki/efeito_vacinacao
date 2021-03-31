@@ -1,0 +1,239 @@
+---
+title: "Internações por SRAG no Brasil"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+    theme: cerulean
+    logo: small48.png
+    favicon: small48.png
+    navbar:
+      - { title: "Sobre mim", href: "http://www.rizbicki.ufscar.br/", align: right}
+runtime: shiny    
+---
+
+<style>    
+.section.sidebar {
+background-color: F8F8F8; 
+}
+
+.navbar {
+background-color:#003D79;
+border-color:white;
+}
+.navbar-brand {
+color:white!important;
+}
+
+.dygraph-legend {
+display: flex;
+flex-direction: column;
+align-items: center;
+border-radius: 5px;
+border: 1px solid #888;
+padding: 10px;
+box-shadow: 1px 1px 1px #CCC;
+transition: transform 0.25s;
+width: 90px;
+}
+</style>  
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.27.0/locale/pt-br.min.js"></script>
+
+<script>
+$(document).ready(function() {
+//Locale info
+moment.locale('pt-br');
+
+/* Setting legend position */
+document.querySelectorAll('.dygraph-legend').forEach(function (el) {
+el.left = false;
+el.right = true;
+})
+
+/* Changing legend except mobile */
+if (document.documentElement.clientWidth > 425) {
+$('.dygraphs.html-widget').on('mousemove', function (e) {
+var _legend = this.querySelector('.dygraph-legend');
+var _w = _legend.offsetWidth;
+
+
+if (document.documentElement.clientWidth - e.pageX < _w && !_legend.left) {
+_legend.style.transform = 'translateX(-115%)';
+_legend.right = false;
+_legend.left = true;
+}
+else if (document.documentElement.clientWidth - e.pageX >= _w && !_legend.right) {
+_legend.style.transform = 'translateX(0)';
+_legend.right = true;
+_legend.left = false;
+}
+});
+}
+});
+
+$('.navbar-logo').wrap('<a href="http://www.small.ufscar.br/">');
+</script>
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(lubridate)
+library(plotly)
+library(scales)
+library(ggthemes)
+
+tmpfile <- tempfile(fileext = ".rds")
+download.file(
+  "https://github.com/jtrecenti/sragData/raw/master/data-raw/dados_SRAG.RDS",
+  tmpfile
+)
+dados <- readr::read_rds(tmpfile)
+file.remove(tmpfile)
+```
+
+
+Inputs {.sidebar}
+----------------------------------
+
+Para visualizar corretamente os gráficos, por favor acesse
+o site de um computador.
+
+<br>
+
+
+```{r}
+
+selectInput("estado",
+            "Estado:",
+            sort(unique(dados$SG_UF_NOT)),
+            selected = c("SP"), 
+            multiple = TRUE, selectize = TRUE)
+``` 
+<br>
+
+(Apenas para o segundo gráfico:)
+<br>
+<br>
+
+
+```{r}
+sliderInput("data_inicio",
+            "Data de base para comparação:",
+            min = min(dados$DT_INTERNA),
+            max = max(dados$DT_INTERNA)-2,
+            value=as.Date("2021-02-01"),
+            timeFormat="%d/%m/%Y")
+```
+
+
+Column {.tabset}
+------------------------------------- 
+
+### Novos casos de SRAG
+
+```{r}
+renderPlotly({
+  
+  dados <- dados %>% 
+    filter(SG_UF_NOT%in% input$estado)
+  
+  
+  dados_resumo_interna <- dados  %>% 
+    filter(!is.na(idade_cat)) %>% 
+    group_by(idade_cat,DT_INTERNA) %>% 
+    summarise(numero_casos=n()) %>% 
+    ungroup() %>% 
+    complete(idade_cat,DT_INTERNA,fill = list(numero_casos=0)) %>% 
+    group_by(idade_cat) %>% 
+    arrange(DT_INTERNA) %>% 
+    mutate(numero_casos_normalizados=numero_casos/sum(numero_casos),
+           numero_casos_normalizados_media_movel=
+             zoo::rollapply(numero_casos_normalizados,7,mean,align='right',fill=NA)) %>% 
+    filter(!is.na(numero_casos_normalizados_media_movel))
+    
+  g <- ggplot(dados_resumo_interna)+
+    geom_line(aes(x=DT_INTERNA,y=numero_casos_normalizados_media_movel,color=idade_cat),size=1) +
+    theme_bw()+
+    theme(axis.text.x = element_text(size=18), legend.text = element_text(size = 14),legend.title = element_text( size = 16,face="bold"),axis.title=element_text(size=18),plot.title = element_text(size=12))+
+    ylab("Número de novos casos de SRAG \n  (média móvel padronizada por idade)")+
+    xlab("")+
+    labs(title = "Fonte: Opendatasus. Dados sujeitos a alterações.")+
+    scale_colour_colorblind(name = "Faixa Etária")+
+    expand_limits(y = 0)
+    
+  
+  
+  ggplotly(g,tooltip = c("idade_cat","DT_INTERNA"))  %>% 
+    highlight(on = "plotly_hover", off ="plotly_deselect",
+              color=c("grey21"),debounce=5)
+  
+})
+```
+
+
+
+
+### Variação de número de novos casos de SRAG
+
+```{r}
+renderPlotly({
+  
+  
+  dados <- dados %>% 
+    filter(SG_UF_NOT%in% input$estado)
+  
+  
+  dados_resumo_interna <- dados  %>% 
+    filter(!is.na(idade_cat)) %>% 
+    group_by(idade_cat,DT_INTERNA) %>% 
+    summarise(numero_casos=n()) %>% 
+    ungroup() %>% 
+    complete(idade_cat,DT_INTERNA,fill = list(numero_casos=0)) %>% 
+    group_by(idade_cat) %>% 
+    arrange(DT_INTERNA) %>% 
+    mutate(numero_casos_normalizados=numero_casos/sum(numero_casos),
+           numero_casos_normalizados_media_movel=
+             zoo::rollapply(numero_casos_normalizados,7,mean,align='right',fill=NA)) 
+  
+  dados_variacao <- dados_resumo_interna %>% 
+    select(idade_cat,DT_INTERNA,numero_casos_normalizados_media_movel) %>% 
+    filter(DT_INTERNA>=input$data_inicio) %>% 
+    group_by(idade_cat) %>% 
+    mutate(Variacao = numero_casos_normalizados_media_movel/first(numero_casos_normalizados_media_movel)-1) 
+  
+  
+  
+  g <- ggplot(dados_variacao)+
+    geom_hline(yintercept = 0, size=2)+
+    geom_line(aes(x=DT_INTERNA,y=Variacao,color=idade_cat),size=1) +
+    theme_bw()+
+    theme(axis.text.x = element_text(size=18), legend.text = element_text(size = 14),legend.title = element_text( size = 16,face="bold"),axis.title=element_text(size=18),plot.title = element_text(size=12))+
+    ylab("Variação no número de novos casos de SRAG \n em relação à data de início")+
+    xlab("")+
+    labs(title = "Fonte: Opendatasus. Dados sujeitos a alterações.")+
+    scale_y_continuous(labels = scales::percent_format(accuracy = 1))+ 
+    scale_colour_colorblind(name = "Faixa Etária")
+    
+  
+  
+  ggplotly(g,tooltip = c("idade_cat","DT_NOTIFIC"))  %>% 
+    highlight(on = "plotly_hover", off ="plotly_deselect",
+              color=c("grey21"),debounce=5)
+  
+})
+```
+
+
+### Mais informações
+
+
+Os dados utilizados  elabordar os gráficos 
+foram obtidos no OpenDataSUS utilizando uma planilha que é atualizada semanalmente ([https://opendatasus.saude.gov.br/dataset/bd-srag-2021](https://opendatasus.saude.gov.br/dataset/bd-srag-2021)).
+Esses dados são constante atualizados, de modo que as curvas podem
+mudar com o tempo. Para tentar minimizar esses efeitos,
+os gráficos mostram estatísticas referentes a internações que ocorreram ao menos três semanas antes da última atualização.
+
+Para sugestões/críticas/erros, por favor me envie um email (que pode ser encontrado em [http://www.rizbicki.ufscar.br/](http://www.rizbicki.ufscar.br/)).
+
+Agradeço ao Tiago Mendonça e ao Julio Trecenti pela ajuda
+na construção desse aplicativo.
