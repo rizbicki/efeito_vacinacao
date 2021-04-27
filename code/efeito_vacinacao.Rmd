@@ -89,6 +89,7 @@ download.file(
 )
 dados <- readr::read_rds(tmpfile)
 file.remove(tmpfile)
+#dados <- readr::read_rds("../../sragData/data-raw/dados_SRAG.RDS")
 ```
 
 
@@ -111,17 +112,31 @@ selectInput("estado",
 ``` 
 <br>
 
-(Apenas para o segundo gráfico:)
+
+```{r}
+radioButtons("idade_cat",
+            "Tipo de categorização de idade:",
+            c("1","2"),
+            selected = c("1"))
+``` 
 <br>
+
+
+```{r}
+radioButtons("media_movel",
+            "Número de dias para a média móvel:",
+            c(7,14),
+            selected = c(7))
+``` 
 <br>
 
 
 ```{r}
 sliderInput("data_inicio",
-            "Data de base para comparação:",
+            "Data de base para comparação (apenas para o terceiro gráfico):",
             min = min(dados$DT_INTERNA),
             max = max(dados$DT_INTERNA)-2,
-            value=as.Date("2021-02-01"),
+            value=as.Date("2021-03-01"),
             timeFormat="%d/%m/%Y")
 ```
 
@@ -129,13 +144,16 @@ sliderInput("data_inicio",
 Column {.tabset}
 ------------------------------------- 
 
-### Novos casos de SRAG
+### Novos casos de internação por SRAG
 
 ```{r}
 renderPlotly({
   
   dados <- dados %>% 
-    filter(SG_UF_NOT%in% input$estado)
+    filter(SG_UF_NOT%in% input$estado) 
+  
+  if(input$idade_cat=="2")
+    dados$idade_cat <- dados$idade_cat2
   
   
   dados_resumo_interna <- dados  %>% 
@@ -148,19 +166,70 @@ renderPlotly({
     arrange(DT_INTERNA) %>% 
     mutate(numero_casos_normalizados=numero_casos/sum(numero_casos),
            numero_casos_normalizados_media_movel=
-             zoo::rollapply(numero_casos_normalizados,7,mean,align='right',fill=NA)) %>% 
+             zoo::rollapply(numero_casos_normalizados,
+                            as.numeric(input$media_movel),mean,align='right',fill=NA)) %>% 
     filter(!is.na(numero_casos_normalizados_media_movel))
-    
+  
   g <- ggplot(dados_resumo_interna)+
     geom_line(aes(x=DT_INTERNA,y=numero_casos_normalizados_media_movel,color=idade_cat),size=1) +
     theme_bw()+
     theme(axis.text.x = element_text(size=18), legend.text = element_text(size = 14),legend.title = element_text( size = 16,face="bold"),axis.title=element_text(size=18),plot.title = element_text(size=12))+
-    ylab("Número de novos casos de SRAG \n  (média móvel padronizada por idade)")+
+    ylab("Número de novos casos de internação por  \n  SRAG COVID (média móvel padronizada por idade)")+
     xlab("")+
     labs(title = "Fonte: Opendatasus. Dados sujeitos a alterações.")+
     scale_colour_colorblind(name = "Faixa Etária")+
     expand_limits(y = 0)
-    
+  
+  
+  
+  ggplotly(g,tooltip = c("idade_cat","DT_INTERNA"))  %>% 
+    highlight(on = "plotly_hover", off ="plotly_deselect",
+              color=c("grey21"),debounce=5)
+  
+})
+```
+
+
+### Porcentagem de interações por SRAG segundo faixa etária
+
+```{r}
+renderPlotly({
+  
+  dados <- dados %>% 
+    filter(SG_UF_NOT%in% input$estado)
+  
+  if(input$idade_cat=="2")
+    dados$idade_cat <- dados$idade_cat2
+  
+  
+  dados_resumo_interna <- dados  %>% 
+    filter(!is.na(idade_cat)) %>% 
+    group_by(idade_cat,DT_INTERNA) %>% 
+    summarise(numero_casos=n()) %>% 
+    ungroup() %>% 
+    complete(idade_cat,DT_INTERNA,fill = list(numero_casos=0)) %>% 
+    group_by(idade_cat) %>% 
+    arrange(DT_INTERNA) %>% 
+    mutate(numero_casos_normalizados=numero_casos/sum(numero_casos),
+           numero_casos_media_movel=
+             zoo::rollapply(numero_casos,as.numeric(input$media_movel),
+                            mean,align='right',fill=NA)) %>% 
+    filter(!is.na(numero_casos_media_movel))
+  
+  dados_resumo_interna <- dados_resumo_interna %>% 
+    group_by(DT_INTERNA) %>% 
+    mutate(percentage=numero_casos_media_movel/sum(numero_casos_media_movel))
+  
+  g <- ggplot(dados_resumo_interna)+
+    geom_line(aes(x=DT_INTERNA,y=percentage,color=idade_cat),size=1) +
+    theme_bw()+
+    theme(axis.text.x = element_text(size=18), legend.text = element_text(size = 14),legend.title = element_text( size = 16,face="bold"),axis.title=element_text(size=18),plot.title = element_text(size=12))+
+    ylab("Porcentagem de novos casos de internação por  \n  SRAG COVID por faixa etária (média móvel)")+
+    xlab("")+
+    labs(title = "Fonte: Opendatasus. Dados sujeitos a alterações.")+
+    scale_colour_colorblind(name = "Faixa Etária")+
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1))
+  
   
   
   ggplotly(g,tooltip = c("idade_cat","DT_INTERNA"))  %>% 
@@ -173,7 +242,7 @@ renderPlotly({
 
 
 
-### Variação de número de novos casos de SRAG
+### Variação de número de novos casos de internação por SRAG
 
 ```{r}
 renderPlotly({
@@ -181,6 +250,9 @@ renderPlotly({
   
   dados <- dados %>% 
     filter(SG_UF_NOT%in% input$estado)
+  
+  if(input$idade_cat=="2")
+    dados$idade_cat <- dados$idade_cat2
   
   
   dados_resumo_interna <- dados  %>% 
@@ -193,7 +265,8 @@ renderPlotly({
     arrange(DT_INTERNA) %>% 
     mutate(numero_casos_normalizados=numero_casos/sum(numero_casos),
            numero_casos_normalizados_media_movel=
-             zoo::rollapply(numero_casos_normalizados,7,mean,align='right',fill=NA)) 
+             zoo::rollapply(numero_casos_normalizados,as.numeric(input$media_movel),
+                            mean,align='right',fill=NA)) 
   
   dados_variacao <- dados_resumo_interna %>% 
     select(idade_cat,DT_INTERNA,numero_casos_normalizados_media_movel) %>% 
@@ -208,12 +281,12 @@ renderPlotly({
     geom_line(aes(x=DT_INTERNA,y=Variacao,color=idade_cat),size=1) +
     theme_bw()+
     theme(axis.text.x = element_text(size=18), legend.text = element_text(size = 14),legend.title = element_text( size = 16,face="bold"),axis.title=element_text(size=18),plot.title = element_text(size=12))+
-    ylab("Variação no número de novos casos de SRAG \n em relação à data de início")+
+    ylab("Variação no número de novos casos de internação \n por SRAG COVID em relação à data de início")+
     xlab("")+
     labs(title = "Fonte: Opendatasus. Dados sujeitos a alterações.")+
     scale_y_continuous(labels = scales::percent_format(accuracy = 1))+ 
     scale_colour_colorblind(name = "Faixa Etária")
-    
+  
   
   
   ggplotly(g,tooltip = c("idade_cat","DT_NOTIFIC"))  %>% 
