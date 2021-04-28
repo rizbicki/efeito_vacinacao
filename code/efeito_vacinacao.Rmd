@@ -1,5 +1,5 @@
 ---
-title: "Internações por SRAG no Brasil"
+title: "Internações por SRAG-COVID no Brasil"
 output: 
   flexdashboard::flex_dashboard:
     orientation: columns
