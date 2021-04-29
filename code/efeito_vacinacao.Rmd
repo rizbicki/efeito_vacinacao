@@ -144,7 +144,7 @@ sliderInput("data_inicio",
 Column {.tabset}
 ------------------------------------- 
 
-### Novos casos de internação por SRAG
+### Novas internações por SRAG COVID
 
 ```{r}
 renderPlotly({
@@ -174,7 +174,7 @@ renderPlotly({
     geom_line(aes(x=DT_INTERNA,y=numero_casos_normalizados_media_movel,color=idade_cat),size=1) +
     theme_bw()+
     theme(axis.text.x = element_text(size=18), legend.text = element_text(size = 14),legend.title = element_text( size = 16,face="bold"),axis.title=element_text(size=18),plot.title = element_text(size=12))+
-    ylab("Número de novos casos de internação por  \n  SRAG COVID (média móvel padronizada por idade)")+
+    ylab("Número de novas internações por  \n  SRAG COVID (média móvel padronizada por idade)")+
     xlab("")+
     labs(title = "Fonte: Opendatasus. Dados sujeitos a alterações.")+
     scale_colour_colorblind(name = "Faixa Etária")+
@@ -190,7 +190,7 @@ renderPlotly({
 ```
 
 
-### Porcentagem de interações por SRAG segundo faixa etária
+### Proporção de novas interações por SRAG COVID segundo faixa etária
 
 ```{r}
 renderPlotly({
@@ -224,7 +224,7 @@ renderPlotly({
     geom_line(aes(x=DT_INTERNA,y=percentage,color=idade_cat),size=1) +
     theme_bw()+
     theme(axis.text.x = element_text(size=18), legend.text = element_text(size = 14),legend.title = element_text( size = 16,face="bold"),axis.title=element_text(size=18),plot.title = element_text(size=12))+
-    ylab("Porcentagem de novos casos de internação por  \n  SRAG COVID por faixa etária (média móvel)")+
+    ylab("Proporção de novas internações por  \n  SRAG COVID por faixa etária (média móvel)")+
     xlab("")+
     labs(title = "Fonte: Opendatasus. Dados sujeitos a alterações.")+
     scale_colour_colorblind(name = "Faixa Etária")+
@@ -242,7 +242,7 @@ renderPlotly({
 
 
 
-### Variação de número de novos casos de internação por SRAG
+### Variação do número de novas internações por SRAG COVID
 
 ```{r}
 renderPlotly({
@@ -274,14 +274,12 @@ renderPlotly({
     group_by(idade_cat) %>% 
     mutate(Variacao = numero_casos_normalizados_media_movel/first(numero_casos_normalizados_media_movel)-1) 
   
-  
-  
   g <- ggplot(dados_variacao)+
     geom_hline(yintercept = 0, size=2)+
     geom_line(aes(x=DT_INTERNA,y=Variacao,color=idade_cat),size=1) +
     theme_bw()+
     theme(axis.text.x = element_text(size=18), legend.text = element_text(size = 14),legend.title = element_text( size = 16,face="bold"),axis.title=element_text(size=18),plot.title = element_text(size=12))+
-    ylab("Variação no número de novos casos de internação \n por SRAG COVID em relação à data de início")+
+    ylab("Variação no número de novas internações \n por SRAG COVID em relação à data de início")+
     xlab("")+
     labs(title = "Fonte: Opendatasus. Dados sujeitos a alterações.")+
     scale_y_continuous(labels = scales::percent_format(accuracy = 1))+ 
